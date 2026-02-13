@@ -105,15 +105,12 @@ export default function SelfieApp() {
         };
         setScatteredPhotos(prev => [...prev, newPhoto]);
 
-        // Flash animation
+        // Full-screen flash effect
         setFlashVisible(true);
-        setTimeout(() => setFlashVisible(false), 150);
-
-        // Stop camera after capture to save battery
-        stopCamera();
+        setTimeout(() => setFlashVisible(false), 200);
       }
     }
-  }, [facingMode, stopCamera]);
+  }, [facingMode]);
 
   const downloadPhoto = useCallback(() => {
     if (capturedPhoto) {
@@ -150,6 +147,10 @@ export default function SelfieApp() {
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden relative">
+      {/* Full-screen flash */}
+      {flashVisible && (
+        <div className="fixed inset-0 bg-white pointer-events-none z-50" style={{ animation: 'flash 0.25s ease-out forwards' }} />
+      )}
       {/* Scattered photos in background */}
       {scatteredPhotos.map((photo) => (
         <div
@@ -165,7 +166,7 @@ export default function SelfieApp() {
             boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
             border: '3px solid white',
             zIndex: 0,
-            opacity: 0,
+            opacity: 1,
             transform: `translate(-50%, -50%)`,
             '--scatter-x': `${photo.x}px`,
             '--scatter-y': `${photo.y}px`,
@@ -188,35 +189,21 @@ export default function SelfieApp() {
 
           {/* Viewfinder */}
           <div className="relative overflow-hidden rounded-2xl bg-slate-900 aspect-[4/3]">
-            {!capturedPhoto ? (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)' }}
-                />
-                {!isStreaming && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center space-y-3">
-                      <Camera className="h-12 w-12 text-slate-500 mx-auto" />
-                      <p className="text-slate-400 text-sm">Tap &ldquo;Start Camera&rdquo; below</p>
-                    </div>
-                  </div>
-                )}
-                {/* Capture flash overlay */}
-                {flashVisible && (
-                  <div className="absolute inset-0 bg-white animate-pulse pointer-events-none" />
-                )}
-              </>
-            ) : (
-              <img
-                src={capturedPhoto}
-                alt="Captured selfie"
-                className="absolute inset-0 w-full h-full object-cover"
-              />
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)' }}
+            />
+            {!isStreaming && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <Camera className="h-12 w-12 text-slate-500 mx-auto" />
+                  <p className="text-slate-400 text-sm">Tap &ldquo;Start Camera&rdquo; below</p>
+                </div>
+              </div>
             )}
             <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
@@ -247,67 +234,50 @@ export default function SelfieApp() {
 
           {/* Action buttons */}
           <div className="flex gap-3 justify-center">
-            {!capturedPhoto ? (
-              <>
-                {!isStreaming ? (
-                  <Button
-                    onClick={() => startCamera()}
-                    size="lg"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-400"
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Start Camera
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={capturePhoto}
-                    size="lg"
-                    className="flex-1 bg-red-500 hover:bg-red-600 focus-visible:ring-red-400 text-white font-medium"
-                  >
-                    <div className="h-5 w-5 mr-2 rounded-full border-2 border-white" />
-                    Capture
-                  </Button>
-                )}
-              </>
+            {!isStreaming ? (
+              <Button
+                onClick={() => startCamera()}
+                size="lg"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-400"
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Start Camera
+              </Button>
             ) : (
               <>
                 <Button
-                  onClick={retakePhoto}
-                  variant="outline"
+                  onClick={capturePhoto}
                   size="lg"
-                  className="flex-1"
+                  className="flex-1 bg-red-500 hover:bg-red-600 focus-visible:ring-red-400 text-white font-medium"
                 >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Retake
+                  <div className="h-5 w-5 mr-2 rounded-full border-2 border-white" />
+                  Capture
                 </Button>
-                <Button
-                  onClick={downloadPhoto}
-                  size="lg"
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 focus-visible:ring-purple-400"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Save
-                </Button>
-                {canShare && (
-                  <Button
-                    onClick={sharePhoto}
-                    size="lg"
-                    variant="outline"
-                    className="border-purple-200 text-purple-700 hover:bg-purple-50"
-                    aria-label="Share photo"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
+                {capturedPhoto && (
+                  <>
+                    <Button
+                      onClick={downloadPhoto}
+                      size="lg"
+                      className="bg-purple-600 hover:bg-purple-700 focus-visible:ring-purple-400"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    {canShare && (
+                      <Button
+                        onClick={sharePhoto}
+                        size="lg"
+                        variant="outline"
+                        className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                        aria-label="Share photo"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </>
                 )}
               </>
             )}
           </div>
-
-          {isStreaming && !capturedPhoto && (
-            <p className="text-center text-xs text-slate-400">
-              Tap capture when you&apos;re ready 📸
-            </p>
-          )}
         </CardContent>
       </Card>
     </div>

@@ -122,9 +122,14 @@
     transform: translate(-50%, -50%) rotate(0deg) scale(1);
   }
   100% {
-    opacity: 0.6;
+    opacity: 1;
     transform: translate(calc(-50% + var(--scatter-x)), calc(-50% + var(--scatter-y))) rotate(var(--scatter-rot)) scale(1);
   }
+}
+
+@keyframes flash {
+  0% { opacity: 0.9; }
+  100% { opacity: 0; }
 }
 
 .scattered-photo {
