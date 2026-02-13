@@ -5,24 +5,32 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Camera, Download, RotateCcw, Sparkles, Share2, X } from 'lucide-react';
 
+interface ScatteredPhoto {
+  id: number;
+  src: string;
+  x: number;
+  y: number;
+  rotation: number;
+  dragX: number;
+  dragY: number;
+}
+
 export default function SelfieApp() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [flashVisible, setFlashVisible] = useState(false);
   const [canShare, setCanShare] = useState(false);
-  const [scatteredPhotos, setScatteredPhotos] = useState<Array<{id: number, src: string, x: number, y: number, rotation: number, direction: {x: number, y: number}}>>([]);
+  const [scatteredPhotos, setScatteredPhotos] = useState<ScatteredPhoto[]>([]);
+  const [dragging, setDragging] = useState<{id: number, startX: number, startY: number, origDragX: number, origDragY: number} | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const photoIdRef = useRef(0);
 
-  // Check Web Share API support
   useEffect(() => {
     setCanShare(typeof navigator !== 'undefined' && !!navigator.share);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (streamRef.current) {
@@ -31,24 +39,45 @@ export default function SelfieApp() {
     };
   }, []);
 
+  // Drag handlers
+  useEffect(() => {
+    if (!dragging) return;
+
+    const onMove = (clientX: number, clientY: number) => {
+      const dx = clientX - dragging.startX;
+      const dy = clientY - dragging.startY;
+      setScatteredPhotos(prev => prev.map(p =>
+        p.id === dragging.id ? { ...p, dragX: dragging.origDragX + dx, dragY: dragging.origDragY + dy } : p
+      ));
+    };
+
+    const onMouseMove = (e: MouseEvent) => onMove(e.clientX, e.clientY);
+    const onTouchMove = (e: TouchEvent) => { e.preventDefault(); onMove(e.touches[0].clientX, e.touches[0].clientY); };
+    const onUp = () => setDragging(null);
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [dragging]);
+
   const startCamera = useCallback(async (mode?: 'user' | 'environment') => {
     const useMode = mode ?? facingMode;
     try {
-      // Stop any existing stream first
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
-
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: useMode,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
+        video: { facingMode: useMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
-
       streamRef.current = stream;
-
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsStreaming(true);
@@ -64,9 +93,7 @@ export default function SelfieApp() {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    if (videoRef.current) videoRef.current.srcObject = null;
     setIsStreaming(false);
   }, []);
 
@@ -75,64 +102,46 @@ export default function SelfieApp() {
       const canvas = canvasRef.current;
       const video = videoRef.current;
       const context = canvas.getContext('2d');
-
       if (context) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-
-        // Mirror the capture for front camera to match what user sees
         if (facingMode === 'user') {
           context.translate(canvas.width, 0);
           context.scale(-1, 1);
         }
-
         context.drawImage(video, 0, 0);
-        context.setTransform(1, 0, 0, 1, 0, 0); // reset
-
+        context.setTransform(1, 0, 0, 1, 0, 0);
         const dataURL = canvas.toDataURL('image/jpeg', 0.92);
-        setCapturedPhoto(dataURL);
 
-        // Scatter photo into background
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 300 + Math.random() * 400;
-        const newPhoto = {
+        // Place photo within visible bounds
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const margin = 80;
+        const x = (Math.random() - 0.5) * (vw - margin * 2);
+        const y = (Math.random() - 0.5) * (vh - margin * 2);
+        const rotation = (Math.random() - 0.5) * 30;
+
+        setScatteredPhotos(prev => [...prev, {
           id: photoIdRef.current++,
           src: dataURL,
-          x: Math.cos(angle) * distance,
-          y: Math.sin(angle) * distance,
-          rotation: (Math.random() - 0.5) * 40,
-          direction: { x: Math.cos(angle), y: Math.sin(angle) },
-        };
-        setScatteredPhotos(prev => [...prev, newPhoto]);
+          x, y, rotation,
+          dragX: 0, dragY: 0,
+        }]);
 
-        // Full-screen flash effect
+        // Flash
         setFlashVisible(true);
         setTimeout(() => setFlashVisible(false), 200);
+        // Camera stays active — no stopCamera()
       }
     }
   }, [facingMode]);
 
-  const downloadPhoto = useCallback(() => {
-    if (capturedPhoto) {
-      const link = document.createElement('a');
-      link.href = capturedPhoto;
-      link.download = `selfie-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
-      link.click();
-    }
-  }, [capturedPhoto]);
-
-  const sharePhoto = useCallback(async () => {
-    if (!capturedPhoto) return;
-    try {
-      const res = await fetch(capturedPhoto);
-      const blob = await res.blob();
-      const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
-      await navigator.share({ files: [file], title: 'My Selfie' });
-    } catch (err) {
-      // User cancelled or share failed — ignore
-      console.log('Share cancelled or failed:', err);
-    }
-  }, [capturedPhoto]);
+  const downloadScatteredPhoto = useCallback((src: string, id: number) => {
+    const link = document.createElement('a');
+    link.href = src;
+    link.download = `selfie-${id}.jpg`;
+    link.click();
+  }, []);
 
   const flipCamera = useCallback(() => {
     const newMode = facingMode === 'user' ? 'environment' : 'user';
@@ -140,10 +149,13 @@ export default function SelfieApp() {
     startCamera(newMode);
   }, [facingMode, startCamera]);
 
-  const retakePhoto = useCallback(() => {
-    setCapturedPhoto(null);
-    startCamera();
-  }, [startCamera]);
+  const startDrag = (id: number, clientX: number, clientY: number) => {
+    const photo = scatteredPhotos.find(p => p.id === id);
+    if (!photo) return;
+    // Bring to front by moving to end
+    setScatteredPhotos(prev => [...prev.filter(p => p.id !== id), photo]);
+    setDragging({ id, startX: clientX, startY: clientY, origDragX: photo.dragX, origDragY: photo.dragY });
+  };
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden relative">
@@ -151,33 +163,51 @@ export default function SelfieApp() {
       {flashVisible && (
         <div className="fixed inset-0 bg-white pointer-events-none z-50" style={{ animation: 'flash 0.25s ease-out forwards' }} />
       )}
-      {/* Scattered photos in background */}
-      {scatteredPhotos.map((photo) => (
+
+      {/* Scattered photos */}
+      {scatteredPhotos.map((photo, idx) => (
         <div
           key={photo.id}
-          className="absolute pointer-events-none scattered-photo"
+          className="absolute select-none"
           style={{
             left: '50%',
             top: '50%',
-            width: 'min(90vw, 28rem)',
+            width: 'min(70vw, 22rem)',
             aspectRatio: '4/3',
             borderRadius: '8px',
-            overflow: 'hidden',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-            border: '3px solid white',
-            zIndex: 0,
-            opacity: 1,
-            transform: `translate(-50%, -50%)`,
-            '--scatter-x': `${photo.x}px`,
-            '--scatter-y': `${photo.y}px`,
-            '--scatter-rot': `${photo.rotation}deg`,
-            animation: 'scatter 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
-          } as React.CSSProperties}
+            overflow: 'visible',
+            zIndex: idx + 1,
+            transform: `translate(calc(-50% + ${photo.x + photo.dragX}px), calc(-50% + ${photo.y + photo.dragY}px)) rotate(${photo.rotation}deg)`,
+            cursor: dragging?.id === photo.id ? 'grabbing' : 'grab',
+            transition: dragging?.id === photo.id ? 'none' : 'box-shadow 0.2s',
+          }}
+          onMouseDown={(e) => { e.preventDefault(); startDrag(photo.id, e.clientX, e.clientY); }}
+          onTouchStart={(e) => { startDrag(photo.id, e.touches[0].clientX, e.touches[0].clientY); }}
         >
-          <img src={photo.src} alt="" className="w-full h-full object-cover" />
+          <div style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+            border: '3px solid white',
+          }}>
+            <img src={photo.src} alt="" className="w-full h-full object-cover" draggable={false} />
+          </div>
+          {/* Download button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); downloadScatteredPhoto(photo.src, photo.id); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className="absolute -bottom-3 -right-3 bg-white rounded-full p-2 shadow-lg hover:bg-slate-50 active:scale-95 transition-transform"
+            style={{ zIndex: 999 }}
+          >
+            <Download className="h-4 w-4 text-slate-600" />
+          </button>
         </div>
       ))}
-      <Card className="w-full max-w-lg mx-auto shadow-xl border-0 bg-white/80 backdrop-blur-sm relative z-10">
+
+      <Card className="w-full max-w-lg mx-auto shadow-xl border-0 bg-white/80 backdrop-blur-sm relative z-[100]">
         <CardContent className="p-5 sm:p-6 space-y-5">
           <div className="text-center space-y-1">
             <div className="flex items-center justify-center gap-2">
@@ -207,8 +237,7 @@ export default function SelfieApp() {
             )}
             <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
 
-            {/* Floating flip & stop buttons when streaming */}
-            {isStreaming && !capturedPhoto && (
+            {isStreaming && (
               <div className="absolute top-3 right-3 flex gap-2">
                 <Button
                   onClick={flipCamera}
@@ -232,7 +261,7 @@ export default function SelfieApp() {
             )}
           </div>
 
-          {/* Action buttons */}
+          {/* Action buttons — capture always visible when streaming */}
           <div className="flex gap-3 justify-center">
             {!isStreaming ? (
               <Button
@@ -244,38 +273,14 @@ export default function SelfieApp() {
                 Start Camera
               </Button>
             ) : (
-              <>
-                <Button
-                  onClick={capturePhoto}
-                  size="lg"
-                  className="flex-1 bg-red-500 hover:bg-red-600 focus-visible:ring-red-400 text-white font-medium"
-                >
-                  <div className="h-5 w-5 mr-2 rounded-full border-2 border-white" />
-                  Capture
-                </Button>
-                {capturedPhoto && (
-                  <>
-                    <Button
-                      onClick={downloadPhoto}
-                      size="lg"
-                      className="bg-purple-600 hover:bg-purple-700 focus-visible:ring-purple-400"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    {canShare && (
-                      <Button
-                        onClick={sharePhoto}
-                        size="lg"
-                        variant="outline"
-                        className="border-purple-200 text-purple-700 hover:bg-purple-50"
-                        aria-label="Share photo"
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </>
-                )}
-              </>
+              <Button
+                onClick={capturePhoto}
+                size="lg"
+                className="flex-1 bg-red-500 hover:bg-red-600 focus-visible:ring-red-400 text-white font-medium"
+              >
+                <div className="h-5 w-5 mr-2 rounded-full border-2 border-white" />
+                Capture
+              </Button>
             )}
           </div>
         </CardContent>
