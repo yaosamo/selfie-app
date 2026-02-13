@@ -13,7 +13,9 @@ export default function SelfieApp() {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [flashVisible, setFlashVisible] = useState(false);
   const [canShare, setCanShare] = useState(false);
+  const [scatteredPhotos, setScatteredPhotos] = useState<Array<{id: number, src: string, x: number, y: number, rotation: number, direction: {x: number, y: number}}>>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const photoIdRef = useRef(0);
 
   // Check Web Share API support
   useEffect(() => {
@@ -90,6 +92,19 @@ export default function SelfieApp() {
         const dataURL = canvas.toDataURL('image/jpeg', 0.92);
         setCapturedPhoto(dataURL);
 
+        // Scatter photo into background
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 150 + Math.random() * 200;
+        const newPhoto = {
+          id: photoIdRef.current++,
+          src: dataURL,
+          x: Math.cos(angle) * distance,
+          y: Math.sin(angle) * distance,
+          rotation: (Math.random() - 0.5) * 40,
+          direction: { x: Math.cos(angle), y: Math.sin(angle) },
+        };
+        setScatteredPhotos(prev => [...prev, newPhoto]);
+
         // Flash animation
         setFlashVisible(true);
         setTimeout(() => setFlashVisible(false), 150);
@@ -134,8 +149,34 @@ export default function SelfieApp() {
   }, [startCamera]);
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg mx-auto shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden relative">
+      {/* Scattered photos in background */}
+      {scatteredPhotos.map((photo) => (
+        <div
+          key={photo.id}
+          className="absolute pointer-events-none scattered-photo"
+          style={{
+            left: '50%',
+            top: '50%',
+            width: '120px',
+            height: '90px',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            border: '3px solid white',
+            zIndex: 0,
+            opacity: 0,
+            transform: `translate(-50%, -50%)`,
+            '--scatter-x': `${photo.x}px`,
+            '--scatter-y': `${photo.y}px`,
+            '--scatter-rot': `${photo.rotation}deg`,
+            animation: 'scatter 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+          } as React.CSSProperties}
+        >
+          <img src={photo.src} alt="" className="w-full h-full object-cover" />
+        </div>
+      ))}
+      <Card className="w-full max-w-lg mx-auto shadow-xl border-0 bg-white/80 backdrop-blur-sm relative z-10">
         <CardContent className="p-5 sm:p-6 space-y-5">
           <div className="text-center space-y-1">
             <div className="flex items-center justify-center gap-2">
