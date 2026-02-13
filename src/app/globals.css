@@ -122,8 +122,8 @@
     transform: translate(-50%, -50%) rotate(0deg) scale(1);
   }
   100% {
-    opacity: 0.7;
-    transform: translate(calc(-50% + var(--scatter-x)), calc(-50% + var(--scatter-y))) rotate(var(--scatter-rot)) scale(0.8);
+    opacity: 0.6;
+    transform: translate(calc(-50% + var(--scatter-x)), calc(-50% + var(--scatter-y))) rotate(var(--scatter-rot)) scale(1);
   }
 }
 

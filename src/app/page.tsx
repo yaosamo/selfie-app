@@ -94,7 +94,7 @@ export default function SelfieApp() {
 
         // Scatter photo into background
         const angle = Math.random() * Math.PI * 2;
-        const distance = 150 + Math.random() * 200;
+        const distance = 300 + Math.random() * 400;
         const newPhoto = {
           id: photoIdRef.current++,
           src: dataURL,
@@ -158,8 +158,8 @@ export default function SelfieApp() {
           style={{
             left: '50%',
             top: '50%',
-            width: '120px',
-            height: '90px',
+            width: 'min(90vw, 28rem)',
+            aspectRatio: '4/3',
             borderRadius: '8px',
             overflow: 'hidden',
             boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
