@@ -191,7 +191,48 @@ export default function SelfieApp() {
     setDragging({ id, startX: clientX, startY: clientY, origDragX: photo.dragX, origDragY: photo.dragY });
   };
 
-  const [gridScrollRef] = useState(() => ({ current: null as HTMLDivElement | null }));
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+  const [gridScroll, setGridScroll] = useState(0);
+
+  // Track scroll in grid mode
+  useEffect(() => {
+    if (!showGrid || !gridScrollRef.current) return;
+    const el = gridScrollRef.current;
+    const onScroll = () => setGridScroll(el.scrollTop);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [showGrid]);
+
+  // Reset scroll when opening grid
+  useEffect(() => {
+    if (showGrid) setGridScroll(0);
+  }, [showGrid]);
+
+  // Compute grid positions
+  const getGridPositions = useCallback(() => {
+    if (typeof window === 'undefined') return [];
+    const vw = window.innerWidth;
+    const cols = vw > 768 ? 3 : 2;
+    const gap = 12;
+    const padding = 16;
+    const topOffset = 72;
+    const availW = Math.min(vw - padding * 2, 900);
+    const cellW = (availW - gap * (cols - 1)) / cols;
+    const cellH = cellW * 0.75;
+    const startX = (vw - availW) / 2;
+
+    return scatteredPhotos.map((_, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      return {
+        left: startX + col * (cellW + gap),
+        top: topOffset + row * (cellH + gap),
+        w: cellW,
+        h: cellH,
+        totalH: topOffset + (Math.floor((scatteredPhotos.length - 1) / cols) + 1) * (cellH + gap) + 32,
+      };
+    });
+  }, [scatteredPhotos]);
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden relative">
@@ -199,88 +240,88 @@ export default function SelfieApp() {
         <div className="fixed inset-0 bg-white pointer-events-none z-50" style={{ animation: 'flash 0.25s ease-out forwards' }} />
       )}
 
-      {/* Scattered photos */}
-      {!showGrid && scatteredPhotos.map((photo, idx) => (
-        <div
-          key={photo.id}
-          className="absolute select-none group"
-          style={{
-            left: '50%',
-            top: '50%',
-            width: 'min(70vw, 22rem)',
-            aspectRatio: '4/3',
-            borderRadius: '8px',
-            overflow: 'visible',
-            zIndex: idx + 1,
-            transform: `translate(calc(-50% + ${photo.x + photo.dragX}px), calc(-50% + ${photo.y + photo.dragY}px)) rotate(${photo.rotation}deg)`,
-            transition: dragging?.id === photo.id
-              ? 'none'
-              : !photo.placed
-                ? 'none'
-                : 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-            cursor: dragging?.id === photo.id ? 'grabbing' : 'grab',
-          }}
-          onMouseDown={(e) => { e.preventDefault(); startDrag(photo.id, e.clientX, e.clientY); }}
-          onTouchStart={(e) => { startDrag(photo.id, e.touches[0].clientX, e.touches[0].clientY); }}
-        >
-          <div className="w-full h-full rounded-lg overflow-hidden transition-shadow duration-200 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)]" style={{
-            boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
-            border: '3px solid white',
-          }}>
-            <img src={photo.src} alt="" className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.02]" draggable={false} />
-          </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); downloadScatteredPhoto(photo.src, photo.id); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            className="absolute -bottom-3 -right-3 bg-white rounded-full p-2 shadow-lg hover:bg-slate-50 active:scale-95 transition-all cursor-pointer opacity-0 group-hover:opacity-100"
-            style={{ zIndex: 999 }}
-          >
-            <Download className="h-4 w-4 text-slate-600" />
-          </button>
-        </div>
-      ))}
-
-      {/* Grid overlay — scrollable */}
+      {/* Grid overlay backdrop + scroll container */}
       {showGrid && (
         <div
-          ref={(el) => { gridScrollRef.current = el; }}
-          className="fixed inset-0 z-[200] overflow-y-auto backdrop-blur-md"
+          ref={gridScrollRef}
+          className="fixed inset-0 z-[150] overflow-y-auto backdrop-blur-md"
           style={{ background: 'color-mix(in oklab, #ffffff00 80%, transparent)' }}
           onClick={() => setShowGrid(false)}
         >
-          <div className="min-h-full p-4 pt-16 pb-8">
-            <div className="fixed top-0 left-0 right-0 z-[210] flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent">
-              <h2 className="text-white text-lg font-medium">All Photos ({scatteredPhotos.length})</h2>
-              <button
-                onClick={() => setShowGrid(false)}
-                className="bg-white/20 hover:bg-white/30 rounded-full p-3 text-white transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+          {/* Spacer for scroll height */}
+          <div style={{ height: `${getGridPositions()[0]?.totalH ?? 0}px`, pointerEvents: 'none' }} />
 
-            <div
-              className="grid gap-3 max-w-4xl mx-auto"
-              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(45vw, 200px), 1fr))' }}
-              onClick={(e) => e.stopPropagation()}
+          {/* Header */}
+          <div className="fixed top-0 left-0 right-0 z-[210] flex items-center justify-between p-4 bg-gradient-to-b from-black/40 to-transparent">
+            <h2 className="text-white text-lg font-medium">All Photos ({scatteredPhotos.length})</h2>
+            <button
+              onClick={() => setShowGrid(false)}
+              className="bg-white/20 hover:bg-white/30 rounded-full p-3 text-white transition-colors"
             >
-              {scatteredPhotos.map((photo) => (
-                <div key={photo.id} className="relative group aspect-[4/3] rounded-xl overflow-hidden bg-slate-800 transition-transform duration-200 hover:scale-[1.03]">
-                  <img src={photo.src} alt="" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                  <button
-                    onClick={() => downloadScatteredPhoto(photo.src, photo.id)}
-                    className="absolute bottom-2 right-2 bg-white/90 hover:bg-white rounded-full p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity active:scale-95 cursor-pointer"
-                  >
-                    <Download className="h-4 w-4 text-slate-700" />
-                  </button>
-                </div>
-              ))}
-            </div>
+              <X className="h-5 w-5" />
+            </button>
           </div>
         </div>
       )}
+
+      {/* Photos — unified elements that transition between scattered and grid */}
+      {scatteredPhotos.map((photo, idx) => {
+        const gridPositions = showGrid ? getGridPositions() : [];
+        const gp = showGrid ? gridPositions[idx] : null;
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 0;
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 0;
+
+        // In grid mode: position from grid layout, offset by scroll
+        const inGrid = showGrid && gp;
+        const tx = inGrid ? gp.left + gp.w / 2 - vw / 2 : photo.x + photo.dragX;
+        const ty = inGrid ? gp.top + gp.h / 2 - vh / 2 - gridScroll : photo.y + photo.dragY;
+        const rot = inGrid ? 0 : photo.rotation;
+        const w = inGrid ? `${gp.w}px` : 'min(70vw, 22rem)';
+        const z = showGrid ? 160 + idx : idx + 1;
+
+        return (
+          <div
+            key={photo.id}
+            className="absolute select-none group"
+            style={{
+              left: '50%',
+              top: '50%',
+              width: w,
+              aspectRatio: '4/3',
+              borderRadius: '8px',
+              overflow: 'visible',
+              zIndex: z,
+              transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) rotate(${rot}deg)`,
+              transition: dragging?.id === photo.id
+                ? 'none'
+                : showGrid
+                  ? 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), width 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                  : !photo.placed
+                    ? 'none'
+                    : 'transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+              cursor: showGrid ? 'default' : (dragging?.id === photo.id ? 'grabbing' : 'grab'),
+            }}
+            onMouseDown={(e) => { if (showGrid) return; e.preventDefault(); startDrag(photo.id, e.clientX, e.clientY); }}
+            onTouchStart={(e) => { if (showGrid) return; startDrag(photo.id, e.touches[0].clientX, e.touches[0].clientY); }}
+          >
+            <div className="w-full h-full rounded-lg overflow-hidden transition-shadow duration-200 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)]" style={{
+              boxShadow: showGrid ? '0 4px 20px rgba(0,0,0,0.3)' : '0 8px 30px rgba(0,0,0,0.2)',
+              border: '3px solid white',
+            }}>
+              <img src={photo.src} alt="" className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.02]" draggable={false} />
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); downloadScatteredPhoto(photo.src, photo.id); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="absolute -bottom-3 -right-3 bg-white rounded-full p-2 shadow-lg hover:bg-slate-50 active:scale-95 transition-all cursor-pointer opacity-0 group-hover:opacity-100"
+              style={{ zIndex: 999 }}
+            >
+              <Download className="h-4 w-4 text-slate-600" />
+            </button>
+          </div>
+        );
+      })}
 
       {/* Camera card */}
       <Card
