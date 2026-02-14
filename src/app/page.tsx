@@ -5,151 +5,41 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Camera, Download, RotateCcw, Sparkles, X, Grid3X3, Wand2 } from 'lucide-react';
 
-// 10 photo styles applied via canvas manipulation
 const PHOTO_STYLES = [
-  { name: 'Original', apply: null },
-  { name: 'B&W', apply: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const g = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
-      d[i] = d[i+1] = d[i+2] = g;
-    }
-    ctx.putImageData(img, 0, 0);
-  }},
-  { name: 'High Contrast', apply: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    const factor = 1.6;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = Math.min(255, Math.max(0, factor * (d[i] - 128) + 128));
-      d[i+1] = Math.min(255, Math.max(0, factor * (d[i+1] - 128) + 128));
-      d[i+2] = Math.min(255, Math.max(0, factor * (d[i+2] - 128) + 128));
-    }
-    ctx.putImageData(img, 0, 0);
-  }},
-  { name: 'Warm Vintage', apply: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = Math.min(255, d[i] * 1.1 + 20);
-      d[i+1] = Math.min(255, d[i+1] * 0.95 + 10);
-      d[i+2] = Math.max(0, d[i+2] * 0.8);
-    }
-    ctx.putImageData(img, 0, 0);
-  }},
-  { name: 'Cool Blue', apply: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = Math.max(0, d[i] * 0.85);
-      d[i+1] = Math.min(255, d[i+1] * 0.95);
-      d[i+2] = Math.min(255, d[i+2] * 1.2 + 15);
-    }
-    ctx.putImageData(img, 0, 0);
-  }},
-  { name: 'Sepia', apply: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const r = d[i], g = d[i+1], b = d[i+2];
-      d[i] = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
-      d[i+1] = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
-      d[i+2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
-    }
-    ctx.putImageData(img, 0, 0);
-  }},
-  { name: 'Dither', apply: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    // Convert to grayscale first
-    const gray = new Float32Array(w * h);
-    for (let i = 0; i < gray.length; i++) {
-      gray[i] = d[i*4] * 0.299 + d[i*4+1] * 0.587 + d[i*4+2] * 0.114;
-    }
-    // Floyd-Steinberg dithering
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = y * w + x;
-        const old = gray[idx];
-        const nw = old < 128 ? 0 : 255;
-        gray[idx] = nw;
-        const err = old - nw;
-        if (x + 1 < w) gray[idx + 1] += err * 7/16;
-        if (y + 1 < h) {
-          if (x > 0) gray[(y+1)*w + x - 1] += err * 3/16;
-          gray[(y+1)*w + x] += err * 5/16;
-          if (x + 1 < w) gray[(y+1)*w + x + 1] += err * 1/16;
-        }
-      }
-    }
-    for (let i = 0; i < gray.length; i++) {
-      d[i*4] = d[i*4+1] = d[i*4+2] = Math.min(255, Math.max(0, gray[i]));
-    }
-    ctx.putImageData(img, 0, 0);
-  }},
-  { name: 'Saturated', apply: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    const boost = 1.8;
-    for (let i = 0; i < d.length; i += 4) {
-      const avg = (d[i] + d[i+1] + d[i+2]) / 3;
-      d[i] = Math.min(255, Math.max(0, avg + (d[i] - avg) * boost));
-      d[i+1] = Math.min(255, Math.max(0, avg + (d[i+1] - avg) * boost));
-      d[i+2] = Math.min(255, Math.max(0, avg + (d[i+2] - avg) * boost));
-    }
-    ctx.putImageData(img, 0, 0);
-  }},
-  { name: 'Invert', apply: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = 255 - d[i];
-      d[i+1] = 255 - d[i+1];
-      d[i+2] = 255 - d[i+2];
-    }
-    ctx.putImageData(img, 0, 0);
-  }},
-  { name: 'Posterize', apply: (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    const levels = 4;
-    const step = 255 / levels;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = Math.round(d[i] / step) * step;
-      d[i+1] = Math.round(d[i+1] / step) * step;
-      d[i+2] = Math.round(d[i+2] / step) * step;
-    }
-    ctx.putImageData(img, 0, 0);
-  }},
+  { name: 'Original', filter: 'none' },
+  { name: 'B&W', filter: 'grayscale(100%)' },
+  { name: 'Faded', filter: 'grayscale(40%) sepia(20%) brightness(1.1)' },
+  { name: 'High Contrast', filter: 'contrast(1.5) saturate(1.3)' },
+  { name: 'Warm', filter: 'sepia(40%) saturate(1.4) brightness(1.05)' },
+  { name: 'Cool', filter: 'saturate(0.8) brightness(1.05) hue-rotate(15deg)' },
+  { name: 'Vivid', filter: 'saturate(2) contrast(1.1)' },
+  { name: 'Noir', filter: 'grayscale(100%) contrast(1.6) brightness(0.9)' },
+  { name: 'Vintage', filter: 'sepia(60%) contrast(0.9) brightness(1.1) saturate(0.7)' },
+  { name: 'Dither', filter: 'grayscale(80%) contrast(2.5) brightness(1.2)' },
 ];
 
 interface ScatteredPhoto {
   id: number;
-  src: string;        // original
-  displaySrc: string; // current (possibly styled)
+  src: string;
   x: number;
   y: number;
   rotation: number;
   dragX: number;
   dragY: number;
   placed: boolean;
-  styleName: string;
+  styleIdx: number;
 }
 
 export default function SelfieApp() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cameraCardRef = useRef<HTMLDivElement>(null);
-  const styleCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [flashVisible, setFlashVisible] = useState(false);
   const [scatteredPhotos, setScatteredPhotos] = useState<ScatteredPhoto[]>([]);
   const [dragging, setDragging] = useState<{id: number, startX: number, startY: number, origDragX: number, origDragY: number} | null>(null);
   const [showGrid, setShowGrid] = useState(false);
-  const [gridScroll, setGridScroll] = useState(0);
-  const gridRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const photoIdRef = useRef(0);
 
@@ -161,20 +51,6 @@ export default function SelfieApp() {
     };
   }, []);
 
-  // Track grid scroll
-  useEffect(() => {
-    if (!showGrid || !gridRef.current) return;
-    const el = gridRef.current;
-    const onScroll = () => setGridScroll(el.scrollTop);
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, [showGrid]);
-
-  useEffect(() => {
-    if (showGrid) setGridScroll(0);
-  }, [showGrid]);
-
-  // Drag handlers
   useEffect(() => {
     if (!dragging) return;
     const onMove = (clientX: number, clientY: number) => {
@@ -202,28 +78,17 @@ export default function SelfieApp() {
   const startCamera = useCallback(async (mode?: 'user' | 'environment') => {
     const useMode = mode ?? facingMode;
     try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
+      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: useMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setIsStreaming(true);
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Unable to access camera. Please ensure you have granted permission.');
-    }
+      if (videoRef.current) { videoRef.current.srcObject = stream; setIsStreaming(true); }
+    } catch { alert('Unable to access camera.'); }
   }, [facingMode]);
 
   const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(track => track.stop()); streamRef.current = null; }
     if (videoRef.current) videoRef.current.srcObject = null;
     setIsStreaming(false);
   }, []);
@@ -236,7 +101,6 @@ export default function SelfieApp() {
     const cardCY = cardRect ? cardRect.top + cardRect.height / 2 : vh / 2;
     const safeW = cardRect ? cardRect.width / 2 + 60 : 220;
     const safeH = cardRect ? cardRect.height / 2 + 60 : 280;
-
     let x: number, y: number;
     for (let i = 0; i < 30; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -260,29 +124,16 @@ export default function SelfieApp() {
       if (context) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        if (facingMode === 'user') {
-          context.translate(canvas.width, 0);
-          context.scale(-1, 1);
-        }
+        if (facingMode === 'user') { context.translate(canvas.width, 0); context.scale(-1, 1); }
         context.drawImage(video, 0, 0);
         context.setTransform(1, 0, 0, 1, 0, 0);
         const dataURL = canvas.toDataURL('image/jpeg', 0.92);
-
         const { x, y } = getScatterPosition();
         const rotation = (Math.random() - 0.5) * 30;
         const newId = photoIdRef.current++;
-
         setScatteredPhotos(prev => [...prev, {
-          id: newId,
-          src: dataURL,
-          displaySrc: dataURL,
-          x: 0, y: 0,
-          rotation: 0,
-          dragX: 0, dragY: 0,
-          placed: false,
-          styleName: 'Original',
+          id: newId, src: dataURL, x: 0, y: 0, rotation: 0, dragX: 0, dragY: 0, placed: false, styleIdx: 0,
         }]);
-
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             setScatteredPhotos(prev => prev.map(p =>
@@ -290,54 +141,44 @@ export default function SelfieApp() {
             ));
           });
         });
-
         setFlashVisible(true);
         setTimeout(() => setFlashVisible(false), 200);
       }
     }
   }, [facingMode, getScatterPosition]);
 
-  const applyRandomStyle = useCallback((photoId: number) => {
-    const photo = scatteredPhotos.find(p => p.id === photoId);
-    if (!photo) return;
-
-    // Pick a random style different from current
-    let style;
-    do {
-      style = PHOTO_STYLES[Math.floor(Math.random() * PHOTO_STYLES.length)];
-    } while (style.name === photo.styleName && PHOTO_STYLES.length > 1);
-
-    if (!style.apply) {
-      // Original
-      setScatteredPhotos(prev => prev.map(p =>
-        p.id === photoId ? { ...p, displaySrc: p.src, styleName: 'Original' } : p
-      ));
+  const downloadScatteredPhoto = useCallback((src: string, id: number, styleIdx: number) => {
+    if (styleIdx === 0) {
+      const link = document.createElement('a');
+      link.href = src;
+      link.download = `selfie-${id}.jpg`;
+      link.click();
       return;
     }
-
-    // Apply style via offscreen canvas
+    // Apply filter via canvas then download
     const img = new Image();
     img.onload = () => {
-      const c = styleCanvasRef.current || document.createElement('canvas');
-      if (!styleCanvasRef.current) styleCanvasRef.current = c;
+      const c = document.createElement('canvas');
       c.width = img.width;
       c.height = img.height;
       const ctx = c.getContext('2d')!;
+      ctx.filter = PHOTO_STYLES[styleIdx].filter;
       ctx.drawImage(img, 0, 0);
-      style.apply!(ctx, c.width, c.height);
-      const result = c.toDataURL('image/jpeg', 0.92);
-      setScatteredPhotos(prev => prev.map(p =>
-        p.id === photoId ? { ...p, displaySrc: result, styleName: style.name } : p
-      ));
+      const link = document.createElement('a');
+      link.href = c.toDataURL('image/jpeg', 0.92);
+      link.download = `selfie-${id}-${PHOTO_STYLES[styleIdx].name.toLowerCase().replace(/\s/g, '-')}.jpg`;
+      link.click();
     };
-    img.src = photo.src; // always apply from original
-  }, [scatteredPhotos]);
+    img.src = src;
+  }, []);
 
-  const downloadScatteredPhoto = useCallback((src: string, id: number) => {
-    const link = document.createElement('a');
-    link.href = src;
-    link.download = `selfie-${id}.jpg`;
-    link.click();
+  const randomizeStyle = useCallback((id: number) => {
+    setScatteredPhotos(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      let newIdx: number;
+      do { newIdx = Math.floor(Math.random() * PHOTO_STYLES.length); } while (newIdx === p.styleIdx && PHOTO_STYLES.length > 1);
+      return { ...p, styleIdx: newIdx };
+    }));
   }, []);
 
   const flipCamera = useCallback(() => {
@@ -366,22 +207,45 @@ export default function SelfieApp() {
     const cellW = (availW - gap * (cols - 1)) / cols;
     const cellH = cellW * 0.75;
     const startX = (vw - availW) / 2;
-
     return scatteredPhotos.map((_, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      const rows = Math.ceil(scatteredPhotos.length / cols);
       return {
         x: startX + col * (cellW + gap) + cellW / 2 - vw / 2,
         y: topOffset + row * (cellH + gap) + cellH / 2 - vh / 2,
         w: cellW,
         h: cellH,
-        totalH: topOffset + rows * (cellH + gap) + 32,
       };
     });
   }, [scatteredPhotos]);
 
   const gridPositions = showGrid ? getGridPositions() : [];
+
+  // Total grid height for scroll
+  const gridTotalHeight = (() => {
+    if (!showGrid || typeof window === 'undefined') return 0;
+    const vw = window.innerWidth;
+    const cols = vw > 768 ? 3 : 2;
+    const gap = 12;
+    const padding = 16;
+    const availW = Math.min(vw - padding * 2, 900);
+    const cellW = (availW - gap * (cols - 1)) / cols;
+    const cellH = cellW * 0.75;
+    const rows = Math.ceil(scatteredPhotos.length / cols);
+    return 80 + rows * (cellH + gap) + 40;
+  })();
+
+  const [gridScroll, setGridScroll] = useState(0);
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showGrid) { setGridScroll(0); return; }
+    const el = gridScrollRef.current;
+    if (!el) return;
+    const onScroll = () => setGridScroll(el.scrollTop);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [showGrid]);
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden relative">
@@ -392,36 +256,35 @@ export default function SelfieApp() {
       {/* Grid overlay — scrollable backdrop */}
       {showGrid && (
         <div
-          ref={gridRef}
-          className="fixed inset-0 z-[150] backdrop-blur-md overflow-auto"
-          style={{ background: 'color-mix(in oklab, #ffffff00 80%, transparent)' }}
+          ref={gridScrollRef}
+          className="fixed inset-0 z-[150] bg-white/95 backdrop-blur-md"
+          style={{ overflowY: 'auto' }}
           onClick={() => setShowGrid(false)}
         >
-          {/* Spacer to make container scrollable */}
-          <div style={{ height: `${gridPositions[0]?.totalH ?? 0}px`, pointerEvents: 'none' }} />
+          {/* Spacer to create scroll height */}
+          <div style={{ height: `${gridTotalHeight}px`, pointerEvents: 'none' }} />
+
+          {/* Header */}
+          <div className="fixed top-0 left-0 right-0 z-[210] flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm">
+            <h2 className="text-slate-800 text-lg font-medium">All Photos ({scatteredPhotos.length})</h2>
+            <button
+              onClick={() => setShowGrid(false)}
+              className="bg-slate-200 hover:bg-slate-300 rounded-full p-3 text-slate-600 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Grid header */}
-      {showGrid && (
-        <div className="fixed top-0 left-0 right-0 z-[210] flex items-center justify-between p-4">
-          <h2 className="text-white text-lg font-medium drop-shadow-lg">All Photos ({scatteredPhotos.length})</h2>
-          <button
-            onClick={() => setShowGrid(false)}
-            className="bg-white/20 hover:bg-white/30 rounded-full p-3 text-white transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-      )}
-
-      {/* Photos — unified, transition between scattered and grid */}
+      {/* Photos — unified, transition between scattered ↔ grid */}
       {scatteredPhotos.map((photo, idx) => {
         const gridPos = showGrid ? gridPositions[idx] : null;
         const tx = showGrid && gridPos ? gridPos.x : photo.x + photo.dragX;
         const ty = showGrid && gridPos ? gridPos.y - gridScroll : photo.y + photo.dragY;
         const rot = showGrid ? 0 : photo.rotation;
         const z = showGrid ? 160 + idx : idx + 1;
+        const style = PHOTO_STYLES[photo.styleIdx];
 
         return (
           <div
@@ -449,29 +312,37 @@ export default function SelfieApp() {
             onTouchStart={(e) => { if (showGrid) return; startDrag(photo.id, e.touches[0].clientX, e.touches[0].clientY); }}
           >
             <div className="w-full h-full rounded-lg overflow-hidden transition-shadow duration-200 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)]" style={{
-              boxShadow: showGrid ? '0 4px 20px rgba(0,0,0,0.3)' : '0 8px 30px rgba(0,0,0,0.2)',
+              boxShadow: showGrid ? '0 4px 20px rgba(0,0,0,0.1)' : '0 8px 30px rgba(0,0,0,0.2)',
               border: '3px solid white',
             }}>
-              <img src={photo.displaySrc} alt="" className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.02]" draggable={false} />
+              <img
+                src={photo.src}
+                alt=""
+                className="w-full h-full object-cover transition-all duration-300 group-hover:scale-[1.02]"
+                style={{ filter: style.filter }}
+                draggable={false}
+              />
             </div>
-            {/* Style name badge */}
-            {photo.styleName !== 'Original' && (
-              <div className="absolute -top-2 -left-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
-                {photo.styleName}
+
+            {/* Style label */}
+            {photo.styleIdx !== 0 && (
+              <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full backdrop-blur-sm pointer-events-none">
+                {style.name}
               </div>
             )}
+
             {/* Action buttons */}
             <div className="absolute -bottom-3 -right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ zIndex: 999 }}>
               <button
-                onClick={(e) => { e.stopPropagation(); applyRandomStyle(photo.id); }}
+                onClick={(e) => { e.stopPropagation(); randomizeStyle(photo.id); }}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 className="bg-white rounded-full p-2 shadow-lg hover:bg-slate-50 active:scale-95 transition-transform cursor-pointer"
               >
-                <Wand2 className="h-4 w-4 text-purple-600" />
+                <Wand2 className="h-4 w-4 text-slate-600" />
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); downloadScatteredPhoto(photo.displaySrc, photo.id); }}
+                onClick={(e) => { e.stopPropagation(); downloadScatteredPhoto(photo.src, photo.id, photo.styleIdx); }}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 className="bg-white rounded-full p-2 shadow-lg hover:bg-slate-50 active:scale-95 transition-transform cursor-pointer"
@@ -499,14 +370,7 @@ export default function SelfieApp() {
           </div>
 
           <div className="relative overflow-hidden rounded-2xl bg-slate-900 aspect-[4/3]">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)' }}
-            />
+            <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)' }} />
             {!isStreaming && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center space-y-3">
@@ -516,25 +380,12 @@ export default function SelfieApp() {
               </div>
             )}
             <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
-
             {isStreaming && (
               <div className="absolute top-3 right-3 flex gap-2">
-                <Button
-                  onClick={flipCamera}
-                  variant="secondary"
-                  size="icon"
-                  className="rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-sm h-9 w-9"
-                  aria-label="Flip camera"
-                >
+                <Button onClick={flipCamera} variant="secondary" size="icon" className="rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-sm h-9 w-9" aria-label="Flip camera">
                   <RotateCcw className="h-4 w-4" />
                 </Button>
-                <Button
-                  onClick={stopCamera}
-                  variant="secondary"
-                  size="icon"
-                  className="rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-sm h-9 w-9"
-                  aria-label="Stop camera"
-                >
+                <Button onClick={stopCamera} variant="secondary" size="icon" className="rounded-full bg-black/40 hover:bg-black/60 text-white border-0 backdrop-blur-sm h-9 w-9" aria-label="Stop camera">
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -543,32 +394,18 @@ export default function SelfieApp() {
 
           <div className="flex gap-3 justify-center">
             {!isStreaming ? (
-              <Button
-                onClick={() => startCamera()}
-                size="lg"
-                className="flex-1 bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-400"
-              >
+              <Button onClick={() => startCamera()} size="lg" className="flex-1 bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-400">
                 <Camera className="h-4 w-4 mr-2" />
                 Start Camera
               </Button>
             ) : (
-              <Button
-                onClick={capturePhoto}
-                size="lg"
-                className="flex-1 bg-red-500 hover:bg-red-600 focus-visible:ring-red-400 text-white font-medium"
-              >
+              <Button onClick={capturePhoto} size="lg" className="flex-1 bg-red-500 hover:bg-red-600 focus-visible:ring-red-400 text-white font-medium">
                 <div className="h-5 w-5 mr-2 rounded-full border-2 border-white" />
                 Capture
               </Button>
             )}
-
             {scatteredPhotos.length > 0 && (
-              <Button
-                onClick={() => setShowGrid(!showGrid)}
-                size="lg"
-                variant="outline"
-                className="bg-white/80 backdrop-blur-sm"
-              >
+              <Button onClick={() => setShowGrid(!showGrid)} size="lg" variant="outline" className="bg-white/80 backdrop-blur-sm">
                 <Grid3X3 className="h-4 w-4 mr-2" />
                 All ({scatteredPhotos.length})
               </Button>
