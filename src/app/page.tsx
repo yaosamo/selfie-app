@@ -194,7 +194,7 @@ export default function SelfieApp() {
   const [gridScrollRef] = useState(() => ({ current: null as HTMLDivElement | null }));
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4 overflow-hidden relative" style={{ background: 'color-mix(in oklab, #ffffff00 80%, transparent)' }}>
+    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden relative">
       {flashVisible && (
         <div className="fixed inset-0 bg-white pointer-events-none z-50" style={{ animation: 'flash 0.25s ease-out forwards' }} />
       )}
@@ -245,7 +245,8 @@ export default function SelfieApp() {
       {showGrid && (
         <div
           ref={(el) => { gridScrollRef.current = el; }}
-          className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md overflow-y-auto"
+          className="fixed inset-0 z-[200] overflow-y-auto backdrop-blur-md"
+          style={{ background: 'color-mix(in oklab, #ffffff00 80%, transparent)' }}
           onClick={() => setShowGrid(false)}
         >
           <div className="min-h-full p-4 pt-16 pb-8">
