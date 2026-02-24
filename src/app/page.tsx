@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Camera, Download, RotateCcw, Sparkles, X, Grid3X3, Wand2 } from 'lucide-react';
+import { Camera, Download, RotateCcw, X, Grid3X3, Wand2 } from 'lucide-react';
 
 const PHOTO_STYLES = [
   { name: 'Original', filter: 'none' },
@@ -172,6 +172,14 @@ export default function SelfieApp() {
     img.src = src;
   }, []);
 
+  const downloadAllPhotos = useCallback(() => {
+    scatteredPhotos.forEach((photo, idx) => {
+      window.setTimeout(() => {
+        downloadScatteredPhoto(photo.src, photo.id, photo.styleIdx);
+      }, idx * 120);
+    });
+  }, [downloadScatteredPhoto, scatteredPhotos]);
+
   const randomizeStyle = useCallback((id: number) => {
     setScatteredPhotos(prev => prev.map(p => {
       if (p.id !== id) return p;
@@ -248,7 +256,10 @@ export default function SelfieApp() {
   }, [showGrid]);
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4 overflow-hidden relative">
+    <div className="min-h-[100dvh] flex items-center justify-center overflow-hidden relative">
+      <p className="fixed left-0 bottom-0 z-[120] m-0 w-9 p-[2em] select-none text-center text-[9px] leading-none tracking-[0.12em] text-slate-400 [writing-mode:vertical-rl] [transform:rotate(180deg)] sm:left-0 sm:bottom-0">
+        DESIGNED BY YAOSAMO
+      </p>
       {flashVisible && (
         <div className="fixed inset-0 bg-white pointer-events-none z-50" style={{ animation: 'flash 0.25s ease-out forwards' }} />
       )}
@@ -357,19 +368,11 @@ export default function SelfieApp() {
       {/* Camera card */}
       <Card
         ref={cameraCardRef}
-        className="w-full max-w-lg mx-auto shadow-xl border-0 bg-white/80 backdrop-blur-sm relative"
+        className="w-full max-w-lg mx-auto overflow-hidden shadow-xl border-0 bg-white/80 backdrop-blur-sm relative p-2 gap-2 rounded-[24px]"
         style={{ zIndex: showGrid ? 50 : 100 }}
       >
-        <CardContent className="p-5 sm:p-6 space-y-5">
-          <div className="text-center space-y-1">
-            <div className="flex items-center justify-center gap-2">
-              <Sparkles className="h-5 w-5 text-blue-500" />
-              <h1 className="text-xl sm:text-2xl font-semibold text-slate-800">Quick Selfie</h1>
-            </div>
-            <p className="text-slate-500 text-sm">Look good, capture it, share it ✨</p>
-          </div>
-
-          <div className="relative overflow-hidden rounded-2xl bg-slate-900 aspect-[4/3]">
+        <CardContent className="p-0">
+          <div className="relative w-full overflow-hidden bg-slate-900 aspect-[4/3] rounded-[16px]">
             <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)' }} />
             {!isStreaming && (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -390,26 +393,35 @@ export default function SelfieApp() {
                 </Button>
               </div>
             )}
+
           </div>
 
-          <div className="flex gap-3 justify-center">
-            {!isStreaming ? (
-              <Button onClick={() => startCamera()} size="lg" className="flex-1 bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-400">
-                <Camera className="h-4 w-4 mr-2" />
-                Start Camera
-              </Button>
-            ) : (
-              <Button onClick={capturePhoto} size="lg" className="flex-1 bg-red-500 hover:bg-red-600 focus-visible:ring-red-400 text-white font-medium">
-                <div className="h-5 w-5 mr-2 rounded-full border-2 border-white" />
-                Capture
-              </Button>
-            )}
-            {scatteredPhotos.length > 0 && (
-              <Button onClick={() => setShowGrid(!showGrid)} size="lg" variant="outline" className="bg-white/80 backdrop-blur-sm">
-                <Grid3X3 className="h-4 w-4 mr-2" />
-                All ({scatteredPhotos.length})
-              </Button>
-            )}
+          <div className="mt-2 rounded-[16px]">
+            <div className="flex flex-wrap gap-2 justify-center">
+              {!isStreaming ? (
+                <Button onClick={() => startCamera()} size="lg" className="flex-1 min-w-[120px] rounded-[16px] bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-400">
+                  <Camera className="h-4 w-4 mr-2" />
+                  Start Camera
+                </Button>
+              ) : (
+                <Button onClick={capturePhoto} size="lg" className="flex-1 min-w-[120px] rounded-[16px] bg-red-500 hover:bg-red-600 focus-visible:ring-red-400 text-white font-medium">
+                  <div className="h-5 w-5 mr-2 rounded-full border-2 border-white" />
+                  Capture
+                </Button>
+              )}
+              {scatteredPhotos.length > 0 && (
+                <Button onClick={downloadAllPhotos} size="lg" variant="outline" className="min-w-[120px] justify-start rounded-[16px] bg-white/85 backdrop-blur-sm">
+                  <Download className="h-4 w-4 shrink-0 mr-2" />
+                  Download All
+                </Button>
+              )}
+              {scatteredPhotos.length > 0 && (
+                <Button onClick={() => setShowGrid(!showGrid)} size="lg" variant="outline" className="min-w-[120px] justify-start rounded-[16px] bg-white/85 backdrop-blur-sm">
+                  <Grid3X3 className="h-4 w-4 shrink-0 mr-2" />
+                  <span className="tabular-nums">All ({scatteredPhotos.length})</span>
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
