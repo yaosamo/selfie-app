@@ -257,6 +257,7 @@ export default function SelfieApp() {
 
   return (
     <div className="min-h-[100dvh] flex items-center justify-center overflow-hidden relative">
+      <h1 className="sr-only">Quick Selfie: free online selfie camera with filters</h1>
       <p className="fixed left-0 bottom-0 z-[120] m-0 w-9 p-[2em] select-none text-center text-[9px] leading-none tracking-[0.12em] text-slate-400 [writing-mode:vertical-rl] [transform:rotate(180deg)] sm:left-0 sm:bottom-0">
         DESIGNED BY YAOSAMO
       </p>
